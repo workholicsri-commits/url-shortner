@@ -1,0 +1,13 @@
+# Dependencies — always regenerated via `npm install`
+node_modules/
+
+# Environment variables — contains secrets, never commit
+.env
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

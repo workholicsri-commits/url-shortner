@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>snip — URL Shortener</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #13131a;
+      --border: #1e1e2e;
+      --accent: #b8ff57;
+      --accent-dim: #8bc43d;
+      --text: #e8e8f0;
+      --muted: #5a5a7a;
+      --error: #ff5f7e;
+      --radius: 12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(184,255,87,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(184,255,87,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    /* Header */
+    .header {
+      margin-bottom: 48px;
+      text-align: left;
+    }
+
+    .logo {
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .logo span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 3.6rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+
+    h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      font-size: 15px;
+      color: var(--muted);
+      font-weight: 400;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="url"] {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="url"]::placeholder { color: var(--muted); }
+
+    input[type="url"]:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      background: var(--accent);
+      color: #0a0a0f;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 22px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s, transform 0.1s;
+      letter-spacing: 0.02em;
+    }
+
+    button:hover { background: #c9ff6e; }
+    button:active { transform: scale(0.97); }
+    button:disabled { background: var(--muted); cursor: not-allowed; transform: none; }
+
+    /* Result */
+    .result {
+      display: none;
+      margin-top: 16px;
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 14px 16px;
+      align-items: center;
+      gap: 10px;
+      animation: slideIn 0.25s ease;
+    }
+
+    .result.show { display: flex; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      white-space: nowrap;
+    }
+
+    .result-url {
+      flex: 1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+    .copy-btn.copied { border-color: var(--accent); color: var(--accent); background: rgba(184,255,87,0.08); }
+
+    /* Error */
+    .error-msg {
+      display: none;
+      margin-top: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--error);
+      padding: 10px 14px;
+      background: rgba(255,95,126,0.06);
+      border: 1px solid rgba(255,95,126,0.2);
+      border-radius: 6px;
+    }
+    .error-msg.show { display: block; animation: slideIn 0.2s ease; }
+
+    /* History */
+    .history-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .history-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .history-title {
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
+
+    .history-count {
+      background: var(--border);
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .history-list {
+      list-style: none;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .history-list::-webkit-scrollbar { width: 4px; }
+    .history-list::-webkit-scrollbar-track { background: transparent; }
+    .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .history-item {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      transition: background 0.15s;
+    }
+
+    .history-item:last-child { border-bottom: none; }
+    .history-item:hover { background: rgba(184,255,87,0.03); }
+
+    .history-arrow {
+      font-size: 10px;
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .history-urls {
+      overflow: hidden;
+    }
+
+    .history-short {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+      display: block;
+    }
+
+    .history-short:hover { text-decoration: underline; }
+
+    .history-original {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .history-copy {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 5px 10px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      border-radius: 5px;
+      transition: all 0.2s;
+    }
+    .history-copy:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+
+    .empty-state {
+      padding: 36px 20px;
+      text-align: center;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    /* Server warning */
+    .server-warning {
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      background: rgba(255,95,126,0.06);
+      border: 1px solid rgba(255,95,126,0.25);
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--error);
+      display: none;
+    }
+    .server-warning.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <div class="logo"><span></span>snip.local</div>
+      <h1>Make long URLs<br/><em>disappear.</em></h1>
+      <p class="subtitle">// paste → shorten → share</p>
+    </div>
+
+    <div class="server-warning" id="serverWarning">
+      ⚠ Cannot reach server at localhost:3000 — make sure you ran <strong>npm start</strong>
+    </div>
+
+    <div class="card">
+      <div class="input-row">
+        <input
+          type="url"
+          id="urlInput"
+          placeholder="https://your-very-long-url.com/goes/here"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="shortenBtn" onclick="shortenUrl()">Snip →</button>
+      </div>
+
+      <div class="result" id="result">
+        <span class="result-label">↗</span>
+        <span class="result-url" id="resultUrl"></span>
+        <button class="copy-btn" id="copyBtn" onclick="copyResult()">copy</button>
+      </div>
+
+      <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <div class="history-card">
+      <div class="history-header">
+        <span class="history-title">// recent links</span>
+        <span class="history-count" id="historyCount">0</span>
+      </div>
+      <ul class="history-list" id="historyList">
+        <li class="empty-state">No links yet — snip your first URL above</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000';
+    let history = [];
+    let lastShortUrl = '';
+
+    // ---- Load existing links from server on page load ----
+    window.addEventListener('load', async () => {
+      try {
+        const res = await fetch(`${API}/`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (data.links && data.links.length > 0) {
+          history = data.links.map(l => ({ short: l.shortUrl, original: l.originalUrl }));
+          renderHistory();
+        }
+      } catch {
+        console.log();
+        //document.getElementById('serverWarning').classList.add('show');
+      }
+    });
+
+    // ---- Enter key support ----
+    document.getElementById('urlInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') shortenUrl();
+    });
+
+    // ---- Main shorten function ----
+    async function shortenUrl() {
+      const input = document.getElementById('urlInput');
+      const btn   = document.getElementById('shortenBtn');
+      const url   = input.value.trim();
+
+      // Hide previous result/error
+      document.getElementById('result').classList.remove('show');
+      document.getElementById('errorMsg').classList.remove('show');
+
+      if (!url) {
+        showError('Please enter a URL first.');
+        return;
+      }
+
+      // Disable button during request
+      btn.disabled = true;
+      btn.textContent = '...';
+
+      try {
+        const res = await fetch(`${API}/shorten`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showError(data.message || data.error || 'Something went wrong.');
+          return;
+        }
+
+        // Show result
+        lastShortUrl = data.shortUrl;
+        document.getElementById('resultUrl').textContent = data.shortUrl;
+        document.getElementById('result').classList.add('show');
+        document.getElementById('copyBtn').textContent = 'copy';
+        document.getElementById('copyBtn').classList.remove('copied');
+
+        // Add to history
+        history.unshift({ short: data.shortUrl, original: url });
+        renderHistory();
+
+        // Clear input
+        input.value = '';
+        document.getElementById('serverWarning').classList.remove('show');
+
+      } catch (err) {
+        showError('Could not reach server. Is it running? (npm start)');
+        //document.getElementById('serverWarning').classList.add('show');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Snip →';
+      }
+    }
+
+    // ---- Copy result URL ----
+    function copyResult() {
+      navigator.clipboard.writeText(lastShortUrl).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = 'copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'copy';
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    // ---- Copy from history ----
+    function copyFromHistory(url, btn) {
+      navigator.clipboard.writeText(url).then(() => {
+        btn.textContent = 'copied!';
+        setTimeout(() => { btn.textContent = 'copy'; }, 2000);
+      });
+    }
+
+    // ---- Render history list ----
+    function renderHistory() {
+      const list  = document.getElementById('historyList');
+      const count = document.getElementById('historyCount');
+
+      count.textContent = history.length;
+
+      if (history.length === 0) {
+        list.innerHTML = '<li class="empty-state">No links yet — snip your first URL above</li>';
+        return;
+      }
+
+      list.innerHTML = history.map(item => `
+        <li class="history-item">
+          <span class="history-arrow">→</span>
+          <div class="history-urls">
+            <a class="history-short" href="${item.short}" target="_blank">${item.short}</a>
+            <div class="history-original" title="${item.original}">${item.original}</div>
+          </div>
+          <button class="history-copy" onclick="copyFromHistory('${item.short}', this)">copy</button>
+        </li>
+      `).join('');
+    }
+
+    // ---- Show error ----
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = '✗ ' + msg;
+      el.classList.add('show');
+    }
+  </script>
+</body>
+</html>
